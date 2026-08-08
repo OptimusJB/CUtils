@@ -43,11 +43,11 @@ Node *create_node(void *element, size_t element_size, int element_type) {
     return new_noeud;
 }
 
-int delete_node(List *list, Node *node, void (*destructor)(void *element_del)) {
+int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
     Node *noeud_suivant;
     Node *noeud_precedent;
     // on supprime l'élément stocké
-    if (destructor) destructor(node->element);
+    if (destructor) destructor(node->element, node->type);
 
     // on change les pointeurs
     noeud_suivant = node->next;
@@ -102,6 +102,9 @@ int l_insert(List *list, int index, void *element, size_t element_size, int elem
     Node *noeud_precedent;
     int index_actuel = 0;
 
+    if (index < 0 && list->size == 0) index = list->size;
+    while (index < 0) index = list->size+index;
+
     if (!new_noeud) return 0;
 
     if (!noeud_actuel) {
@@ -119,6 +122,7 @@ int l_insert(List *list, int index, void *element, size_t element_size, int elem
     // cas où l'index demandé est trop élevé
     if (index_actuel != index) {
         noeud_actuel->next = new_noeud;
+        new_noeud->previous = noeud_actuel;
         list->size++;
         return 1;
     }
@@ -144,7 +148,7 @@ int l_insert(List *list, int index, void *element, size_t element_size, int elem
 }
 
 int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type, int do_copy) {
-    if (!table || !list || list->head) return 0;
+    if (!table || !list /*|| list->head*/) return 0;
     int i;
     size_t taille_element = 0;
 
@@ -176,10 +180,13 @@ void l_print(List *list, void (*print)(void *element_print, int element_type)) {
     printf("END\n");
 }
 
-int l_pop(List *list, int index, void (*destructor)(void *element_del)) {
+int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     int index_actuel = 0;
     Node *noeud_actuel = list->head;
+
+    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    while (index < 0) index = list->size+index;
 
     // on va à l'index voulu
     while (noeud_actuel->next != NULL && index_actuel < index) {
@@ -196,7 +203,7 @@ int l_pop(List *list, int index, void (*destructor)(void *element_del)) {
     return 1;
 }
 
-int l_remove(List *list, void *element, void (*destructor)(void *element_del)) {
+int l_remove(List *list, void *element, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     Node *noeud_actuel = list->head;
     void *element_actuel;
@@ -217,6 +224,9 @@ void *l_get(List *list, int index) {
     Node *noeud_actuel = list->head;
     int index_actuel = 0;
 
+    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    while (index < 0) index = list->size+index;
+
     while (noeud_actuel != NULL) {
         if (index_actuel == index) return noeud_actuel->element;
         index_actuel++;
@@ -229,6 +239,9 @@ int l_get_type(List *list, int index) {
     if (!list || !list->head) return -1;
     Node *noeud_actuel = list->head;
     int index_actuel = 0;
+
+    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    while (index < 0) index = list->size+index;
 
     while (noeud_actuel != NULL) {
         if (index_actuel == index) return noeud_actuel->type;
