@@ -180,6 +180,11 @@ void l_print(List *list, void (*print)(void *element_print, int element_type)) {
     printf("END\n");
 }
 
+void l_destructor(void *element_del, int element_type) {
+    // fonction à mettre dans le paramètre destructor des fonctions dans le cas où l'élément a été copié
+    free(element_del);
+}
+
 int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     int index_actuel = 0;
@@ -217,6 +222,17 @@ int l_remove(List *list, void *element, void (*destructor)(void *element_del, in
         noeud_actuel = noeud_actuel->next;
     }
     return 0;
+}
+
+int l_delete(List *list, void (*destructor)(void *element_del, int element_type)) {
+    if (!list || !list->head) return 0;
+    Node *noeud_actuel = list->head;
+
+    while (noeud_actuel != NULL) {
+        if (!delete_node(list, noeud_actuel, destructor)) return 0;
+        noeud_actuel = noeud_actuel->next;
+    }
+    return 1;
 }
 
 void *l_get(List *list, int index) {
