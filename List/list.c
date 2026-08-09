@@ -7,6 +7,8 @@
 struct Node{
     void *element;
     int type;
+    size_t element_size;
+    int is_copy;
     Node *previous;
     Node *next;
 };
@@ -16,7 +18,7 @@ void l_init(List *list) {
     list->head = NULL;
 }
 
-Node *create_node(void *element, size_t element_size, int element_type) {
+Node *create_node(void *element, size_t element_size, int element_type, int do_copy) {
     void *new_element;
     Node *new_noeud = malloc(sizeof(Node));
 
@@ -25,9 +27,11 @@ Node *create_node(void *element, size_t element_size, int element_type) {
     new_noeud->type = element_type;
     new_noeud->next = NULL;
     new_noeud->previous = NULL;
+    new_noeud->element_size = element_size;
+    new_noeud->is_copy = do_copy;
 
-    // si element_size > 0, on copie l'élément, sinon on prend le même
-    if (element_size == 0) {
+    // si do_copy, on copie l'élément, sinon on prend le même
+    if (!do_copy) {
         new_noeud->element = element;
     }
     else {
@@ -47,7 +51,8 @@ int delete_node(List *list, Node *node, void (*destructor)(void *element_del, in
     Node *noeud_suivant;
     Node *noeud_precedent;
     // on supprime l'élément stocké
-    if (destructor) destructor(node->element, node->type);
+    if (node->is_copy) free(node->element);
+    else if (destructor) destructor(node->element, node->type);
 
     // on change les pointeurs
     noeud_suivant = node->next;
@@ -71,9 +76,9 @@ int delete_node(List *list, Node *node, void (*destructor)(void *element_del, in
     return 1;
 }
 
-int l_append(List *list, void *element, size_t element_size, int element_type) {
+int l_append(List *list, void *element, size_t element_size, int element_type, int do_copy) {
     if (!list) return 0;
-    Node *new_noeud = create_node(element, element_size, element_type);
+    Node *new_noeud = create_node(element, element_size, element_type, do_copy);
     Node *noeud_actuel = list->head;
 
     if (!new_noeud) return 0;
@@ -95,9 +100,17 @@ int l_append(List *list, void *element, size_t element_size, int element_type) {
     return 1;
 }
 
-int l_insert(List *list, int index, void *element, size_t element_size, int element_type) {
+int l_append_ref(List *list, void *element, size_t element_size, int element_type){
+    return l_append(list, element, element_size, element_type, 0);
+}
+
+int l_append_copy(List *list, void *element, size_t element_size, int element_type){
+    return l_append(list, element, element_size, element_type, 1);
+}
+
+int l_insert(List *list, int index, void *element, size_t element_size, int element_type, int do_copy) {
     if (!list) return 0;
-    Node *new_noeud = create_node(element, element_size, element_type);
+    Node *new_noeud = create_node(element, element_size, element_type, do_copy);
     Node *noeud_actuel = list->head;
     Node *noeud_precedent;
     int index_actuel = 0;
@@ -147,22 +160,33 @@ int l_insert(List *list, int index, void *element, size_t element_size, int elem
 
 }
 
+int l_insert_ref(List *list, int index, void *element, size_t element_size, int element_type){
+    return l_insert(list, index, element, element_size, element_type, 0);
+}
+
+int l_insert_copy(List *list, int index, void *element, size_t element_size, int element_type){
+    return l_insert(list, index, element, element_size, element_type, 1);
+}
+
 int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type, int do_copy) {
     if (!table || !list /*|| list->head*/) return 0;
     int i;
-    size_t taille_element = 0;
 
     l_init(list);
 
-    if (do_copy) {
-        taille_element = element_size;
-    }
-
     for (i=0; i < table_size; i++) {
         // (char *) obligatoire (type à 1 octet) car void souvent pas compatible avec arithmétique
-        if (!l_append(list, (char *)table + i * element_size, taille_element, element_type)) return 0;
+        if (!l_append(list, (char *)table + i * element_size, element_size, element_type, do_copy)) return 0;
     }
     return 1;
+}
+
+int l_from_table_ref(List *list, void *table, int table_size, size_t element_size, int element_type){
+    return l_from_table(list, table, table_size, element_size, element_type, 0);
+}
+
+int l_from_table_copy(List *list, void *table, int table_size, size_t element_size, int element_type){
+    return l_from_table(list, table, table_size, element_size, element_type, 1);
 }
 
 void l_print(List *list, void (*print)(void *element_print, int element_type)) {
@@ -178,11 +202,6 @@ void l_print(List *list, void (*print)(void *element_print, int element_type)) {
         noeud_actuel = noeud_actuel->next;
     }
     printf("END\n");
-}
-
-void l_destructor(void *element_del, int element_type) {
-    // fonction à mettre dans le paramètre destructor des fonctions dans le cas où l'élément a été copié
-    free(element_del);
 }
 
 int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type)) {
@@ -227,10 +246,12 @@ int l_remove(List *list, void *element, void (*destructor)(void *element_del, in
 int l_delete(List *list, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     Node *noeud_actuel = list->head;
+    Node *noeud_suivant;
 
     while (noeud_actuel != NULL) {
+        noeud_suivant = noeud_actuel->next;
         if (!delete_node(list, noeud_actuel, destructor)) return 0;
-        noeud_actuel = noeud_actuel->next;
+        noeud_actuel = noeud_suivant;
     }
     return 1;
 }

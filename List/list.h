@@ -16,15 +16,18 @@ typedef struct {
 } List;
 
 void l_init(List *list);
-int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type, int do_copy);
 
-int l_append(List *list, void *element, size_t element_size, int element_type);
-int l_insert(List *list, int index, void *element, size_t element_size, int element_type);
+int l_from_table_ref(List *list, void *table, int table_size, size_t element_size, int element_type);
+int l_from_table_copy(List *list, void *table, int table_size, size_t element_size, int element_type);
+
+int l_insert_ref(List *list, int index, void *element, size_t element_size, int element_type);
+int l_insert_copy(List *list, int index, void *element, size_t element_size, int element_type);
+int l_append_ref(List *list, void *element, size_t element_size, int element_type);
+int l_append_copy(List *list, void *element, size_t element_size, int element_type);
 
 int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type));
 int l_remove(List *list, void *element, void (*destructor)(void *element_del, int element_type));
 int l_delete(List *list, void (*destructor)(void *element_del, int element_type));
-void l_destructor(void *element_del, int element_type);
 
 void l_print(List *list, void (*print)(void *element_print, int element_type));
 void *l_get(List *list, int index);
