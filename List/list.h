@@ -6,7 +6,8 @@
 #define TYPE_INT 0
 #define TYPE_DOUBLE 1
 #define TYPE_FLOAT 2
-#define TYPE_STRING 3
+#define TYPE_CHAR 3
+#define TYPE_STRING 4
 
 typedef struct Node Node;
 typedef struct List List;
