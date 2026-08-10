@@ -50,7 +50,14 @@ Node *create_node(void *element, size_t element_size, int element_type, int do_c
 int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
     Node *noeud_suivant;
     Node *noeud_precedent;
-    // on supprime l'élément stocké
+    /*
+    on supprime l'élément stocké
+    si l'élément a été copié, on le libère automatiquement (comme ce sont les fonctions qui allouent, ce sont également les fonctions qui libèrent)
+    de plus on appelle pas le destructor car :
+        - l'utilisateur peut potentiellement essayer de free l'élément -> problème car déjà libéré
+        - c'est inutile dans le cas de types plat (int, char, etc)
+        - dans le cas d'un struct avec un pointeur en propriété, ce pointeur est potentiellement encore utilisé par l'original, il ne vaut mieux donc pas le supprimer
+    */
     if (node->is_copy) free(node->element);
     else if (destructor) destructor(node->element, node->type);
 
