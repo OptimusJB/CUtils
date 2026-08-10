@@ -13,12 +13,25 @@ struct Node{
     Node *next;
 };
 
-void l_init(List *list) {
+struct List{
+    int size;
+    Node *head;
+};
+
+static int l_init(List *list) {
+    if (!list) return 0;
     list->size = 0;
     list->head = NULL;
+    return 1;
 }
 
-Node *create_node(void *element, size_t element_size, int element_type, int do_copy) {
+List *l_new() {
+    List *list = malloc(sizeof(List));
+    l_init(list);
+    return list;
+}
+
+static Node *create_node(void *element, size_t element_size, int element_type, int do_copy) {
     void *new_element;
     Node *new_noeud = malloc(sizeof(Node));
 
@@ -47,7 +60,7 @@ Node *create_node(void *element, size_t element_size, int element_type, int do_c
     return new_noeud;
 }
 
-int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
+static int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
     Node *noeud_suivant;
     Node *noeud_precedent;
     /*
@@ -83,7 +96,7 @@ int delete_node(List *list, Node *node, void (*destructor)(void *element_del, in
     return 1;
 }
 
-int l_append(List *list, void *element, size_t element_size, int element_type, int do_copy) {
+static int l_append(List *list, void *element, size_t element_size, int element_type, int do_copy) {
     if (!list) return 0;
     Node *new_noeud = create_node(element, element_size, element_type, do_copy);
     Node *noeud_actuel = list->head;
@@ -115,7 +128,7 @@ int l_append_copy(List *list, void *element, size_t element_size, int element_ty
     return l_append(list, element, element_size, element_type, 1);
 }
 
-int l_insert(List *list, int index, void *element, size_t element_size, int element_type, int do_copy) {
+static int l_insert(List *list, int index, void *element, size_t element_size, int element_type, int do_copy) {
     if (!list) return 0;
     Node *new_noeud = create_node(element, element_size, element_type, do_copy);
     Node *noeud_actuel = list->head;
@@ -175,8 +188,8 @@ int l_insert_copy(List *list, int index, void *element, size_t element_size, int
     return l_insert(list, index, element, element_size, element_type, 1);
 }
 
-int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type, int do_copy) {
-    if (!table || !list /*|| list->head*/) return 0;
+static int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type, int do_copy) {
+    if (!table || !list || list->head) return 0;
     int i;
 
     l_init(list);
@@ -250,7 +263,7 @@ int l_remove(List *list, void *element, void (*destructor)(void *element_del, in
     return 0;
 }
 
-int l_delete(List *list, void (*destructor)(void *element_del, int element_type)) {
+int l_clear(List *list, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     Node *noeud_actuel = list->head;
     Node *noeud_suivant;
@@ -260,6 +273,12 @@ int l_delete(List *list, void (*destructor)(void *element_del, int element_type)
         if (!delete_node(list, noeud_actuel, destructor)) return 0;
         noeud_actuel = noeud_suivant;
     }
+    return 1;
+}
+
+int l_free(List *list) {
+    if (!list || list->head) return 0;
+    free(list);
     return 1;
 }
 
@@ -298,4 +317,56 @@ int l_get_type(List *list, int index) {
 int l_get_size(List *list) {
     if (!list) return 0;
     return list->size;
+}
+
+static int l_sub(List *dest, List *src, int begin, int end, int do_copy) {
+    Node *src_actuel;
+    Node *dest_actuel;
+    Node *new_noeud;
+    int index_actuel = 0;
+    if (!dest || !src || dest->head || !src->head) return 0;
+    src_actuel = src->head;
+    dest_actuel = dest->head;
+
+    if (begin >= src->size) begin = src->size;
+    if (end >= src->size) end = src->size;
+
+    if (begin < 0 && src->size == 0) begin = 0;
+    while (begin < 0) begin = src->size+begin;
+    if (end < 0 && src->size == 0) end = 0;
+    while (end < 0) end = src->size+end;
+
+    if (begin > end) return 0;
+
+    while (index_actuel != begin && index_actuel != src->size - 1) {
+        src_actuel = src_actuel->next;
+        if (!src_actuel) return 0;  // ne s'exécute normalement jamais car begin est inférieur à la taille de src
+        index_actuel++;
+    }
+
+    while (begin < end) {
+        new_noeud = create_node(src_actuel->element, src_actuel->element_size, src_actuel->type, do_copy);
+
+        if (!dest->head) { // première itération (clion dit "condition always true" mais c'est faux)
+            dest->head = new_noeud;
+            dest_actuel = dest->head;
+        }
+        else {
+            dest_actuel->next = new_noeud;
+            new_noeud->previous = dest_actuel;
+            dest_actuel = dest_actuel->next;
+        }
+        dest->size++;
+        src_actuel = src_actuel->next;
+        begin++;
+    }
+    return 1;
+}
+
+int l_sub_ref(List *dest, List *src, int begin, int end) {
+    return l_sub(dest, src, begin, end, 0);
+}
+
+int l_sub_copy(List *dest, List *src, int begin, int end) {
+    return l_sub(dest, src, begin, end, 1);
 }
