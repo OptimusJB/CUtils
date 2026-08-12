@@ -15,22 +15,17 @@ typedef struct List List;
 List *l_new();
 int l_free(List *list);
 
-int l_from_table_ref(List *list, void *table, int table_size, size_t element_size, int element_type);
-int l_from_table_copy(List *list, void *table, int table_size, size_t element_size, int element_type);
+int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type);
 
-int l_insert_ref(List *list, int index, void *element, size_t element_size, int element_type);
-int l_insert_copy(List *list, int index, void *element, size_t element_size, int element_type);
-int l_append_ref(List *list, void *element, size_t element_size, int element_type);
-int l_append_copy(List *list, void *element, size_t element_size, int element_type);
-int l_set_ref(List *list, int index, void *element, size_t element_size, int element_type);
-int l_set_copy(List *list, int index, void *element, size_t element_size, int element_type);
+int l_insert(List *list, int index, void *element, int element_type);
+int l_append(List *list, void *element, int element_type);
+int l_set(List *list, int index, void *element, int element_type);
 
 int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type));
 int l_remove(List *list, void *element, void (*destructor)(void *element_del, int element_type));
 int l_clear(List *list, void (*destructor)(void *element_del, int element_type));
 
-int l_sub_ref(List *dest, List *src, int begin, int end);
-int l_sub_copy(List *dest, List *src, int begin, int end);
+int l_sub(List *dest, List *src, int begin, int end);
 
 int l_reverse(List *list);
 int l_sort(List *list, int (*compare)(void *a, void *b, int type_a, int type_b));
