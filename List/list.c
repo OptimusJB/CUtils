@@ -128,6 +128,49 @@ int l_append_copy(List *list, void *element, size_t element_size, int element_ty
     return l_append(list, element, element_size, element_type, 1);
 }
 
+int l_set(List *list, int index, void *element, size_t element_size, int element_type, int do_copy) {
+    if (!list || !list->head) return 0;
+    Node *noeud_actuel = list->head;
+    int index_actuel = 0;
+    void *new_element;
+
+    if (index < 0 && list->size == 0) index = list->size;
+    while (index < 0) index = list->size+index;
+
+    // on va à l'index voulu
+    while (noeud_actuel->next != NULL && index_actuel < index) {
+        noeud_actuel = noeud_actuel->next;
+        index_actuel++;
+    }
+
+    // cas où l'index demandé est trop élevé
+    if (index_actuel != index) {
+        return 0;
+    }
+
+    // on copie l'élément si do_copy
+    if (do_copy) {
+        new_element = malloc(element_size);
+        if (!new_element) return 0;
+        memcpy(new_element, element, element_size);
+    }
+    else new_element = element;
+
+    noeud_actuel->element = new_element;
+    noeud_actuel->type = element_type;
+    noeud_actuel->element_size = element_size;
+    noeud_actuel->is_copy = do_copy;
+    return 1;
+}
+
+int l_set_ref(List *list, int index, void *element, size_t element_size, int element_type) {
+    return l_set(list, index, element, element_size, element_type, 0);
+}
+
+int l_set_copy(List *list, int index, void *element, size_t element_size, int element_type) {
+    return l_set(list, index, element, element_size, element_type, 1);
+}
+
 static int l_insert(List *list, int index, void *element, size_t element_size, int element_type, int do_copy) {
     if (!list) return 0;
     Node *new_noeud = create_node(element, element_size, element_type, do_copy);
@@ -247,6 +290,40 @@ int l_pop(List *list, int index, void (*destructor)(void *element_del, int eleme
     return 1;
 }
 
+int l_index(List *list, void *element) {
+    // retourne -1 si non trouvé
+    if (!list || !list->head) return -1;
+    Node *noeud_actuel = list->head;
+    void *element_actuel;
+    int index_actuel = 0;
+
+    while (noeud_actuel != NULL) {
+        element_actuel = noeud_actuel->element;
+        if (element_actuel == element) {
+            return index_actuel;
+        }
+        noeud_actuel = noeud_actuel->next;
+        index_actuel++;
+    }
+    return -1;
+}
+
+int l_reverse(List *list) {
+    if (!list) return 0;
+    Node *noeud_actuel = list->head;
+    Node *noeud_suivant;
+
+    while (noeud_actuel) {
+        noeud_suivant = noeud_actuel->next;
+        noeud_actuel->next = noeud_actuel->previous;
+        noeud_actuel->previous = noeud_suivant;
+
+        list->head = noeud_actuel;
+        noeud_actuel = noeud_suivant;
+    }
+    return 1;
+}
+
 int l_remove(List *list, void *element, void (*destructor)(void *element_del, int element_type)) {
     if (!list || !list->head) return 0;
     Node *noeud_actuel = list->head;
@@ -319,7 +396,8 @@ int l_get_size(List *list) {
     return list->size;
 }
 
-static int l_sub(List *dest, List *src, int begin, int end, int do_copy) {
+static int l_sub(List *dest, List *src, int begin, int end, int do_copy, int keep_copy) {
+    // keep_copy détermine si on garde is_copy de la source (utile uniquement pour l_sort (pour ne pas perdre d'informations), dans la majorité des cas il faut mettre 0)
     Node *src_actuel;
     Node *dest_actuel;
     Node *new_noeud;
@@ -346,6 +424,7 @@ static int l_sub(List *dest, List *src, int begin, int end, int do_copy) {
 
     while (begin < end) {
         new_noeud = create_node(src_actuel->element, src_actuel->element_size, src_actuel->type, do_copy);
+        if (keep_copy) new_noeud->is_copy = src_actuel->is_copy;
 
         if (!dest->head) { // première itération (clion dit "condition always true" mais c'est faux)
             dest->head = new_noeud;
@@ -364,9 +443,72 @@ static int l_sub(List *dest, List *src, int begin, int end, int do_copy) {
 }
 
 int l_sub_ref(List *dest, List *src, int begin, int end) {
-    return l_sub(dest, src, begin, end, 0);
+    return l_sub(dest, src, begin, end, 0, 0);
 }
 
 int l_sub_copy(List *dest, List *src, int begin, int end) {
-    return l_sub(dest, src, begin, end, 1);
+    return l_sub(dest, src, begin, end, 1, 0);
+}
+
+int l_sort(List *list, int (*compare)(void *a, void *b, int type_a, int type_b)) {
+    if (!list) return 0;
+    Node *noeud_actuel;
+    Node *gauche_actuel;
+    Node *droite_actuel;
+    Node *choisi;
+    int moitie = list->size / 2;
+
+    // cas de base
+    if (list->size <= 1) return 1;
+
+    // on crée les deux parties
+    List *gauche = l_new();
+    List *droite = l_new();
+
+    l_sub(gauche, list, 0, moitie, 0, 1);
+    l_sub(droite, list, moitie, list->size, 0, 1);
+
+    l_sort(gauche, compare);
+    l_sort(droite, compare);
+
+    // triage
+    gauche_actuel = gauche->head;
+    droite_actuel = droite->head;
+    noeud_actuel = list->head;
+    while ((gauche_actuel || droite_actuel) && noeud_actuel) {
+        if (gauche_actuel && !droite_actuel) {
+            choisi = gauche_actuel;
+            gauche_actuel = gauche_actuel->next;
+        }
+        else if (!gauche_actuel && droite_actuel) {
+            choisi = droite_actuel;
+            droite_actuel = droite_actuel->next;
+        }
+        else if (gauche_actuel && droite_actuel) {
+            if (compare(gauche_actuel->element, droite_actuel->element, gauche_actuel->type, droite_actuel->type) < 0) {
+                choisi = gauche_actuel;
+                gauche_actuel = gauche_actuel->next;
+            }
+            else {
+                choisi = droite_actuel;
+                droite_actuel = droite_actuel->next;
+            }
+        }
+
+        noeud_actuel->element = choisi->element;
+        noeud_actuel->element_size = choisi->element_size;
+        noeud_actuel->type = choisi->type;
+        noeud_actuel->is_copy = choisi->is_copy;
+
+        choisi->is_copy = 0; // important pour le l_clear après, pour empêcher la suppression automatique
+
+        noeud_actuel = noeud_actuel->next;
+    }
+
+    // on libère la mémoire
+    l_clear(gauche, NULL);
+    l_clear(droite, NULL);
+    l_free(gauche);
+    l_free(droite);
+    return 1;
 }
