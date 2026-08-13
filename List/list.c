@@ -44,16 +44,12 @@ static Node *create_node(void *element, int element_type) {
 }
 
 static int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
+    // Note : dans cette fonction il vaut mieux éviter de return 0 après avoir fait une suppression partielle (car en cas d'échec l_clear garde le noeud actuel)
+    if (!list || !node) return 0;
     Node *noeud_suivant;
     Node *noeud_precedent;
-    /*
-    on supprime l'élément stocké
-    si l'élément a été copié, on le libère automatiquement (comme ce sont les fonctions qui allouent, ce sont également les fonctions qui libèrent)
-    de plus on appelle pas le destructor car :
-        - l'utilisateur peut potentiellement essayer de free l'élément -> problème car déjà libéré
-        - c'est inutile dans le cas de types plat (int, char, etc)
-        - dans le cas d'un struct avec un pointeur en propriété, ce pointeur est potentiellement encore utilisé par l'original, il ne vaut mieux donc pas le supprimer
-    */
+
+    // on supprime l'élément stocké
     if (destructor) destructor(node->element, node->type);
 
     // on change les pointeurs
@@ -71,7 +67,7 @@ static int delete_node(List *list, Node *node, void (*destructor)(void *element_
         noeud_suivant->previous = noeud_precedent;
     }
 
-    // on supprime le noeud
+    // on supprime le noeud (doit être à la fin, on doit être sûr que ça retourne 1, pour éviter les problèmes avec l_clear)
     free(node);
 
     list->size--;
@@ -189,7 +185,10 @@ int l_from_table(List *list, void *table, int table_size, size_t element_size, i
 
     for (i=0; i < table_size; i++) {
         // (char *) obligatoire (type à 1 octet) car void souvent pas compatible avec arithmétique
-        if (!l_append(list, (char *)table + i * element_size, element_type)) return 0;
+        if (!l_append(list, (char *)table + i * element_size, element_type)) {
+            l_clear(list, NULL);
+            return 0;
+        }
     }
     return 1;
 }
@@ -289,7 +288,10 @@ int l_clear(List *list, void (*destructor)(void *element_del, int element_type))
 
     while (noeud_actuel != NULL) {
         noeud_suivant = noeud_actuel->next;
-        if (!delete_node(list, noeud_actuel, destructor)) return 0;
+        if (!delete_node(list, noeud_actuel, destructor)) {
+            list->head = noeud_actuel; // pour éviter que des noeuds se retrouvent dans la nature. On est sûr grâce à delete_node que noeud_actuel est toujours là.
+            return 0;
+        }
         noeud_actuel = noeud_suivant;
     }
     return 1;
@@ -365,6 +367,10 @@ int l_sub(List *dest, List *src, int begin, int end) {
 
     while (begin < end) {
         new_noeud = create_node(src_actuel->element, src_actuel->type);
+        if (!new_noeud) {
+            l_clear(dest, NULL);
+            return 0;
+        }
 
         if (!dest->head) { // première itération (clion dit "condition always true" mais c'est faux)
             dest->head = new_noeud;
