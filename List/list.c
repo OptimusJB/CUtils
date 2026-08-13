@@ -282,7 +282,8 @@ int l_remove(List *list, void *element, void (*destructor)(void *element_del, in
 }
 
 int l_clear(List *list, void (*destructor)(void *element_del, int element_type)) {
-    if (!list || !list->head) return 0;
+    if (!list) return 0;
+    if (!list->head) return 1; // liste déjà vide
     Node *noeud_actuel = list->head;
     Node *noeud_suivant;
 
@@ -388,79 +389,27 @@ int l_sub(List *dest, List *src, int begin, int end) {
     return 1;
 }
 
+
 int l_sort(List *list, int (*compare)(void *a, void *b, int type_a, int type_b)) {
-    if (!list) return 0;
-    Node *noeud_actuel;
-    Node *gauche_actuel;
-    Node *droite_actuel;
-    Node *choisi;
-    int moitie = list->size / 2;
+    if (!list || !compare) return 0;
+    if (!list->head) return 1; // liste vide donc déjà triée
+    Node *i = list->head->next, *j;
+    int temp_type;
+    void *temp_element;
 
-    // cas de base
-    if (list->size <= 1) return 1;
+    while (i != NULL) {
+        j = i;
+        while (j->previous && compare(j->previous->element, j->element, j->previous->type, j->type) > 0) {
+            temp_type = j->previous->type;
+            temp_element = j->previous->element;
+            j->previous->type = j->type;
+            j->previous->element = j->element;
+            j->type = temp_type;
+            j->element = temp_element;
 
-    // on crée les deux parties
-    List *gauche = l_new();
-    List *droite = l_new();
-
-    if (!gauche && !droite) return 0;
-    else if (gauche && !droite) {
-        free(gauche);
-        return 0;
-    }
-    else if (!gauche && droite) {
-        free(droite);
-        return 0;
-    }
-
-
-    if (!l_sub(gauche, list, 0, moitie) ||
-    !l_sub(droite, list, moitie, list->size) ||
-
-    !l_sort(gauche, compare) ||
-    !l_sort(droite, compare)) {
-        l_clear(gauche, NULL);
-        l_clear(droite, NULL);
-        l_free(gauche);
-        l_free(droite);
-        return 0;
-    }
-
-
-    // triage
-    gauche_actuel = gauche->head;
-    droite_actuel = droite->head;
-    noeud_actuel = list->head;
-    while ((gauche_actuel || droite_actuel) && noeud_actuel) {
-        if (gauche_actuel && !droite_actuel) {
-            choisi = gauche_actuel;
-            gauche_actuel = gauche_actuel->next;
+            j = j->previous;
         }
-        else if (!gauche_actuel && droite_actuel) {
-            choisi = droite_actuel;
-            droite_actuel = droite_actuel->next;
-        }
-        else if (gauche_actuel && droite_actuel) {
-            if (compare(gauche_actuel->element, droite_actuel->element, gauche_actuel->type, droite_actuel->type) < 0) {
-                choisi = gauche_actuel;
-                gauche_actuel = gauche_actuel->next;
-            }
-            else {
-                choisi = droite_actuel;
-                droite_actuel = droite_actuel->next;
-            }
-        }
-
-        noeud_actuel->element = choisi->element;
-        noeud_actuel->type = choisi->type;
-
-        noeud_actuel = noeud_actuel->next;
+        i = i->next;
     }
-
-    // on libère la mémoire
-    l_clear(gauche, NULL);
-    l_clear(droite, NULL);
-    l_free(gauche);
-    l_free(droite);
     return 1;
 }
