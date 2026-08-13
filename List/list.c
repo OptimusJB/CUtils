@@ -403,11 +403,29 @@ int l_sort(List *list, int (*compare)(void *a, void *b, int type_a, int type_b))
     List *gauche = l_new();
     List *droite = l_new();
 
-    l_sub(gauche, list, 0, moitie);
-    l_sub(droite, list, moitie, list->size);
+    if (!gauche && !droite) return 0;
+    else if (gauche && !droite) {
+        free(gauche);
+        return 0;
+    }
+    else if (!gauche && droite) {
+        free(droite);
+        return 0;
+    }
 
-    l_sort(gauche, compare);
-    l_sort(droite, compare);
+
+    if (!l_sub(gauche, list, 0, moitie) ||
+    !l_sub(droite, list, moitie, list->size) ||
+
+    !l_sort(gauche, compare) ||
+    !l_sort(droite, compare)) {
+        l_clear(gauche, NULL);
+        l_clear(droite, NULL);
+        l_free(gauche);
+        l_free(droite);
+        return 0;
+    }
+
 
     // triage
     gauche_actuel = gauche->head;
