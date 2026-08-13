@@ -87,6 +87,7 @@ int run_tests() {
 
     // test sort
     l_clear(list, NULL);
+    l_sort(list, compare);
     l_from_table(list, tab2, 12, sizeof(int), TYPE_INT);
     l_sort(list, compare);
 
