@@ -2,6 +2,8 @@
 #define LIST_H
 #include <stddef.h> // pour size_t
 
+#define TYPE_ERROR -2
+
 #define TYPE_UNDEFINED -1
 #define TYPE_INT 0
 #define TYPE_DOUBLE 1
@@ -9,7 +11,6 @@
 #define TYPE_CHAR 3
 #define TYPE_STRING 4
 
-typedef struct Node Node;
 typedef struct List List;
 
 List *l_new();

@@ -4,22 +4,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct Node{
+typedef struct {
     void *element;
-    int type;
-    Node *previous;
-    Node *next;
-};
+    int element_type;
+} Lelement;
 
-struct List{
+struct List {
     int size;
-    Node *head;
+    int capacity;
+    Lelement **tab;
 };
 
 static int l_init(List *list) {
     if (!list) return 0;
     list->size = 0;
-    list->head = NULL;
+    list->capacity = 4;
+    list->tab = malloc(list->capacity * sizeof(Lelement));
+    if (!(list->tab)) return 0;
     return 1;
 }
 
@@ -29,46 +30,53 @@ List *l_new() {
     return list;
 }
 
-static Node *create_node(void *element, int element_type) {
-    void *new_element;
-    Node *new_noeud = malloc(sizeof(Node));
+static Lelement *create_lelement(void *element, int element_type) {
+    Lelement *new_l_element = malloc(sizeof(Lelement));
 
-    if (!new_noeud) return NULL;
+    if (!new_l_element) return NULL;
 
-    new_noeud->type = element_type;
-    new_noeud->next = NULL;
-    new_noeud->previous = NULL;
+    new_l_element->element_type = element_type;
 
-    new_noeud->element = element;
-    return new_noeud;
+    new_l_element->element = element;
+    return new_l_element;
 }
 
-static int delete_node(List *list, Node *node, void (*destructor)(void *element_del, int element_type)) {
-    // Note : dans cette fonction il vaut mieux éviter de return 0 après avoir fait une suppression partielle (car en cas d'échec l_clear garde le noeud actuel)
-    if (!list || !node) return 0;
-    Node *noeud_suivant;
-    Node *noeud_precedent;
+static int adapt_capacity(List *list) {
+    // à appeler au début des fonctions
+    int new_capacity;
+    Lelement **new_tab;
+    if (!list) return 0;
+
+    new_capacity = list->capacity;
+
+    if (list->size == list->capacity) new_capacity = list->capacity * 2;
+    else if (list->size <= list->capacity / 4 && list->capacity / 2 >= 4) new_capacity = list->capacity / 2;
+
+    if (new_capacity != list->capacity) {
+        new_tab = realloc(list->tab, new_capacity * sizeof(Lelement));
+        if (!new_tab) return 0;
+        list->tab = new_tab;
+    }
+    list->capacity = new_capacity;
+    return 1;
+}
+
+static int delete_element(List *list, Lelement *l_element, int element_index, void (*destructor)(void *element_del, int element_type)) {
+    // note : cette fonction met à jour la liste en plus de libérer l'élément
+    int i;
+    if (!list || !l_element) return 0;
+    if (!adapt_capacity(list)) return 0;
 
     // on supprime l'élément stocké
-    if (destructor) destructor(node->element, node->type);
+    if (destructor) destructor(l_element->element, l_element->element_type);
 
-    // on change les pointeurs
-    noeud_suivant = node->next;
-    noeud_precedent = node->previous;
-
-    if (noeud_precedent && !noeud_suivant) noeud_precedent->next = NULL;
-    else if (!noeud_precedent && noeud_suivant) {
-        noeud_suivant->previous = NULL;
-        list->head = noeud_suivant;
+    // on décale tous les éléments
+    for (i=element_index + 1; i<list->size; i++) {
+        list->tab[i - 1] = list->tab[i];
     }
-    else if (!noeud_precedent && !noeud_suivant) list->head = NULL;
-    else if (noeud_precedent && noeud_suivant) {
-        noeud_precedent->next = noeud_suivant;
-        noeud_suivant->previous = noeud_precedent;
-    }
-
-    // on supprime le noeud (doit être à la fin, on doit être sûr que ça retourne 1, pour éviter les problèmes avec l_clear)
-    free(node);
+    
+    // on supprime le Lelement
+    free(l_element);
 
     list->size--;
     return 1;
@@ -76,112 +84,56 @@ static int delete_node(List *list, Node *node, void (*destructor)(void *element_
 
 int l_append(List *list, void *element, int element_type) {
     if (!list) return 0;
-    Node *new_noeud = create_node(element, element_type);
-    Node *noeud_actuel = list->head;
+    if (!adapt_capacity(list)) return 0;
+    Lelement *new_l_element = create_lelement(element, element_type);
 
-    if (!new_noeud) return 0;
+    if (!new_l_element) return 0;
 
-    if (!noeud_actuel) {
-        list->head = new_noeud;
-        list->size++;
-        return 1;
-    }
-
-    // on ajoute le noeud à la fin de la liste
-    while (noeud_actuel->next != NULL) {
-        noeud_actuel = noeud_actuel->next;
-    }
-    noeud_actuel->next = new_noeud;
-    new_noeud->previous = noeud_actuel;
+    list->tab[list->size] = new_l_element;
     list->size++;
 
     return 1;
 }
 
 int l_set(List *list, int index, void *element, int element_type) {
-    if (!list || !list->head) return 0;
-    Node *noeud_actuel = list->head;
-    int index_actuel = 0;
-    void *new_element;
-
-    if (index < 0 && list->size == 0) index = list->size;
+    if (!list || index >= list->size) return 0;
+    if (index < 0 && list->size == 0) index = 0;
     while (index < 0) index = list->size+index;
 
-    // on va à l'index voulu
-    while (noeud_actuel->next != NULL && index_actuel < index) {
-        noeud_actuel = noeud_actuel->next;
-        index_actuel++;
-    }
-
-    // cas où l'index demandé est trop élevé
-    if (index_actuel != index) {
-        return 0;
-    }
-
-    new_element = element;
-
-    noeud_actuel->element = new_element;
-    noeud_actuel->type = element_type;
+    list->tab[index]->element = element;
+    list->tab[index]->element_type = element_type;
     return 1;
 }
 
 int l_insert(List *list, int index, void *element, int element_type) {
+    int i;
     if (!list) return 0;
-    Node *new_noeud = create_node(element, element_type);
-    Node *noeud_actuel = list->head;
-    Node *noeud_precedent;
-    int index_actuel = 0;
+    if (!adapt_capacity(list)) return 0;
 
-    if (index < 0 && list->size == 0) index = list->size;
+    if (index >= list->size) index = list->size;
+    if (index < 0 && list->size == 0) index = 0;
     while (index < 0) index = list->size+index;
+    
+    Lelement *new_l_element = create_lelement(element, element_type);
+    if (!new_l_element) return 0;
 
-    if (!new_noeud) return 0;
-
-    if (!noeud_actuel) {
-        list->head = new_noeud;
-        list->size++;
-        return 1;
+    // on décale tout vers la droite
+    for (i=list->size; i>index; i--) {
+        list->tab[i] = list->tab[i - 1];
     }
 
-    // on va à l'index voulu
-    while (noeud_actuel->next != NULL && index_actuel < index) {
-        noeud_actuel = noeud_actuel->next;
-        index_actuel++;
-    }
-
-    // cas où l'index demandé est trop élevé
-    if (index_actuel != index) {
-        noeud_actuel->next = new_noeud;
-        new_noeud->previous = noeud_actuel;
-        list->size++;
-        return 1;
-    }
-
-    // cas où on met l'élément au début
-    if (index == 0) {
-        noeud_actuel->previous = new_noeud;
-        new_noeud->next = noeud_actuel;
-        list->head = new_noeud;
-        list->size++;
-        return 1;
-    }
-
-    noeud_precedent = noeud_actuel->previous;
-    noeud_precedent->next = new_noeud;
-    noeud_actuel->previous = new_noeud;
-
-    new_noeud->previous = noeud_precedent;
-    new_noeud->next = noeud_actuel;
+    // on met le nouvel élément dans le tableau
+    list->tab[index] = new_l_element;
     list->size++;
     return 1;
 
 }
 
 int l_from_table(List *list, void *table, int table_size, size_t element_size, int element_type) {
-    if (!table || !list || list->head) return 0;
+    if (!table || !list || list->size > 0) return 0;
     int i;
 
-    l_init(list);
+    // l_init(list); // ne surtout pas mettre, car sinon list->tab est remplacé sans être libéré
 
     for (i=0; i < table_size; i++) {
         // (char *) obligatoire (type à 1 octet) car void souvent pas compatible avec arithmétique
@@ -194,146 +146,97 @@ int l_from_table(List *list, void *table, int table_size, size_t element_size, i
 }
 
 void l_print(List *list, void (*print)(void *element_print, int element_type)) {
+    int i;
     if (!list) {
-        printf("not a list");
+        printf("NULL list");
         return;
     }
     printf("BEGIN\n");
-    Node *noeud_actuel = list->head;
 
-    while (noeud_actuel != NULL) {
-        print(noeud_actuel->element, noeud_actuel->type);
-        noeud_actuel = noeud_actuel->next;
+    for (i=0; i<list->size;i++) {
+        print(list->tab[i]->element, list->tab[i]->element_type);
     }
+
     printf("END\n");
 }
 
 int l_pop(List *list, int index, void (*destructor)(void *element_del, int element_type)) {
-    if (!list || !list->head) return 0;
-    int index_actuel = 0;
-    Node *noeud_actuel = list->head;
-
-    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    if (!list || list->size == 0) return 0;
+    if (index >= list->size) return 0;
+    if (index < 0 && list->size == 0) index = 0;
     while (index < 0) index = list->size+index;
 
-    // on va à l'index voulu
-    while (noeud_actuel->next != NULL && index_actuel < index) {
-        noeud_actuel = noeud_actuel->next;
-        index_actuel++;
-    }
-
-    // cas où l'index demandé est trop élevé
-    if (index_actuel != index) return 0;
-
-
-    if (!delete_node(list, noeud_actuel, destructor)) return 0;
-
+    if (!delete_element(list, list->tab[index], index, destructor)) return 0;
     return 1;
 }
 
 int l_index(List *list, void *element) {
     // retourne -1 si non trouvé
-    if (!list || !list->head) return -1;
-    Node *noeud_actuel = list->head;
-    void *element_actuel;
-    int index_actuel = 0;
+    int i;
+    if (!list || list->size == 0) return -1;
 
-    while (noeud_actuel != NULL) {
-        element_actuel = noeud_actuel->element;
-        if (element_actuel == element) {
-            return index_actuel;
-        }
-        noeud_actuel = noeud_actuel->next;
-        index_actuel++;
+    for (i=0; i<list->size; i++) {
+        if (list->tab[i]->element == element) return i;
     }
     return -1;
 }
 
 int l_reverse(List *list) {
     if (!list) return 0;
-    Node *noeud_actuel = list->head;
-    Node *noeud_suivant;
+    int i=0, j=list->size - 1;
+    Lelement *temp;
 
-    while (noeud_actuel) {
-        noeud_suivant = noeud_actuel->next;
-        noeud_actuel->next = noeud_actuel->previous;
-        noeud_actuel->previous = noeud_suivant;
-
-        list->head = noeud_actuel;
-        noeud_actuel = noeud_suivant;
+    while (i<j) {
+        temp = list->tab[i];
+        list->tab[i] = list->tab[j];
+        list->tab[j] = temp;
+        i++;
+        j--;
     }
     return 1;
 }
 
 int l_remove(List *list, void *element, void (*destructor)(void *element_del, int element_type)) {
-    if (!list || !list->head) return 0;
-    Node *noeud_actuel = list->head;
-    void *element_actuel;
-
-    while (noeud_actuel != NULL) {
-        element_actuel = noeud_actuel->element;
-        if (element_actuel == element) {
-            if (!delete_node(list, noeud_actuel, destructor)) return 0;
-            return 1;
-        }
-        noeud_actuel = noeud_actuel->next;
-    }
-    return 0;
+    if (!list || list->size == 0) return 0;
+    int index = l_index(list, element);
+    if (index < 0) return 0;
+    return l_pop(list, index, destructor);
 }
 
 int l_clear(List *list, void (*destructor)(void *element_del, int element_type)) {
+    int i, taille = list->size;
     if (!list) return 0;
-    if (!list->head) return 1; // liste déjà vide
-    Node *noeud_actuel = list->head;
-    Node *noeud_suivant;
+    if (list->size == 0) return 1; // liste déjà vide
 
-    while (noeud_actuel != NULL) {
-        noeud_suivant = noeud_actuel->next;
-        if (!delete_node(list, noeud_actuel, destructor)) {
-            list->head = noeud_actuel; // pour éviter que des noeuds se retrouvent dans la nature. On est sûr grâce à delete_node que noeud_actuel est toujours là.
-            return 0;
-        }
-        noeud_actuel = noeud_suivant;
+    for (i=0; i<taille; i++) {
+        if (!delete_element(list, list->tab[0], 0, destructor)) return 0;
     }
     return 1;
 }
 
 int l_free(List *list) {
-    if (!list || list->head) return 0;
+    // non libérée si la liste n'est pas vide
+    if (!list || list->size > 0) return 0;
+    free(list->tab);
     free(list);
     return 1;
 }
 
 void *l_get(List *list, int index) {
-    if (!list || !list->head) return NULL;
-    Node *noeud_actuel = list->head;
-    int index_actuel = 0;
-
-    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    if (!list || list->size == 0) return NULL;
+    if (index >= list->size) return NULL;
+    if (index < 0 && list->size == 0) index = 0;
     while (index < 0) index = list->size+index;
 
-    while (noeud_actuel != NULL) {
-        if (index_actuel == index) return noeud_actuel->element;
-        index_actuel++;
-        noeud_actuel = noeud_actuel->next;
-    }
-    return NULL;
+    return list->tab[index]->element;
 }
 
 int l_get_type(List *list, int index) {
-    if (!list || !list->head) return -1;
-    Node *noeud_actuel = list->head;
-    int index_actuel = 0;
-
-    if (index < 0 && list->size == 0) index = list->size; // normalement inutile grâce au !list->head
+    if (!list || list->size == 0) return TYPE_ERROR;
+    if (index >= list->size) return TYPE_ERROR;
+    if (index < 0 && list->size == 0) index = 0;
     while (index < 0) index = list->size+index;
-
-    while (noeud_actuel != NULL) {
-        if (index_actuel == index) return noeud_actuel->type;
-        index_actuel++;
-        noeud_actuel = noeud_actuel->next;
-    }
-    return -1;
+    return list->tab[index]->element_type;
 }
 
 int l_get_size(List *list) {
@@ -342,13 +245,8 @@ int l_get_size(List *list) {
 }
 
 int l_sub(List *dest, List *src, int begin, int end) {
-    Node *src_actuel;
-    Node *dest_actuel;
-    Node *new_noeud;
-    int index_actuel = 0;
-    if (!dest || !src || dest->head || !src->head) return 0;
-    src_actuel = src->head;
-    dest_actuel = dest->head;
+    int i;
+    if (!dest || !src || dest->size != 0) return 0;
 
     if (begin >= src->size) begin = src->size;
     if (end >= src->size) end = src->size;
@@ -358,58 +256,32 @@ int l_sub(List *dest, List *src, int begin, int end) {
     if (end < 0 && src->size == 0) end = 0;
     while (end < 0) end = src->size+end;
 
-    if (begin > end) return 0;
+    if (begin > end) return 0; // ne sert pas trop mais on met quand même au cas où
 
-    while (index_actuel != begin && index_actuel != src->size - 1) {
-        src_actuel = src_actuel->next;
-        if (!src_actuel) return 0;  // ne s'exécute normalement jamais car begin est inférieur à la taille de src
-        index_actuel++;
-    }
-
-    while (begin < end) {
-        new_noeud = create_node(src_actuel->element, src_actuel->type);
-        if (!new_noeud) {
+    for (i=begin; i<end; i++) {
+        if (!l_append(dest, src->tab[i]->element, src->tab[i]->element_type)) {
             l_clear(dest, NULL);
             return 0;
         }
-
-        if (!dest->head) { // première itération (clion dit "condition always true" mais c'est faux)
-            dest->head = new_noeud;
-            dest_actuel = dest->head;
-        }
-        else {
-            dest_actuel->next = new_noeud;
-            new_noeud->previous = dest_actuel;
-            dest_actuel = dest_actuel->next;
-        }
-        dest->size++;
-        src_actuel = src_actuel->next;
-        begin++;
     }
     return 1;
 }
 
 
 int l_sort(List *list, int (*compare)(void *a, void *b, int type_a, int type_b)) {
+    int i, j;
+    Lelement *temp;
     if (!list || !compare) return 0;
-    if (!list->head) return 1; // liste vide donc déjà triée
-    Node *i = list->head->next, *j;
-    int temp_type;
-    void *temp_element;
 
-    while (i != NULL) {
+    for (i=1; i<list->size; i++) {
+        temp = list->tab[i];
+
         j = i;
-        while (j->previous && compare(j->previous->element, j->element, j->previous->type, j->type) > 0) {
-            temp_type = j->previous->type;
-            temp_element = j->previous->element;
-            j->previous->type = j->type;
-            j->previous->element = j->element;
-            j->type = temp_type;
-            j->element = temp_element;
-
-            j = j->previous;
+        while (j > 0 && compare(list->tab[j-1]->element, temp->element, list->tab[j-1]->element_type, temp->element_type) > 0) {
+            list->tab[j] = list-> tab[j-1];
+            j--;
         }
-        i = i->next;
+        list->tab[j] = temp;
     }
     return 1;
 }
