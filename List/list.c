@@ -19,7 +19,7 @@ static int l_init(List *list) {
     if (!list) return 0;
     list->size = 0;
     list->capacity = 4;
-    list->tab = malloc(list->capacity * sizeof(Lelement));
+    list->tab = malloc(list->capacity * sizeof(Lelement *));
     if (!(list->tab)) return 0;
     return 1;
 }
@@ -53,7 +53,7 @@ static int adapt_capacity(List *list) {
     else if (list->size <= list->capacity / 4 && list->capacity / 2 >= 4) new_capacity = list->capacity / 2;
 
     if (new_capacity != list->capacity) {
-        new_tab = realloc(list->tab, new_capacity * sizeof(Lelement));
+        new_tab = realloc(list->tab, new_capacity * sizeof(Lelement *));
         if (!new_tab) return 0;
         list->tab = new_tab;
     }
