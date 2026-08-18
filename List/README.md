@@ -182,7 +182,8 @@ Paramètres :
 - liste à traiter
 - index de l'élément à récupérer
 
-Il s'agit d'une fonction permettant de récupérer le type de l'élément (voir [Bon à savoir](#bon-à-savoir)) à l'index choisi dans une liste.
+Il s'agit d'une fonction permettant de récupérer le type de l'élément (voir [Bon à savoir](#bon-à-savoir)) à l'index choisi dans une liste.  
+Retourne TYPE_ERROR en cas de paramètres invalides.
 
 ### l_get_size
 Paramètres :
