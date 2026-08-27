@@ -1,4 +1,5 @@
 #include "list.h"
+#include "../list.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -321,7 +322,7 @@ void *l_get(List *list, int index) {
 }
 
 int l_get_type(List *list, int index) {
-    if (!list || !list->head) return -1;
+    if (!list || !list->head) return TYPE_ERROR;
     Node *noeud_actuel = list->head;
     int index_actuel = 0;
 
@@ -333,7 +334,7 @@ int l_get_type(List *list, int index) {
         index_actuel++;
         noeud_actuel = noeud_actuel->next;
     }
-    return -1;
+    return TYPE_ERROR;
 }
 
 int l_get_size(List *list) {
