@@ -26,7 +26,12 @@ static int l_init(List *list) {
 
 List *l_new() {
     List *list = malloc(sizeof(List));
-    l_init(list);
+    if (!list) return NULL;
+
+    if (!l_init(list)) {
+        free(list);
+        return NULL;
+    }
     return list;
 }
 
@@ -97,7 +102,7 @@ int l_append(List *list, void *element, int element_type) {
 
 int l_set(List *list, int index, void *element, int element_type) {
     if (!list || index >= list->size) return 0;
-    if (index < 0 && list->size == 0) index = 0;
+    if (index < 0 && list->size == 0) return 0;
     while (index < 0) index = list->size+index;
 
     list->tab[index]->element = element;
@@ -153,8 +158,10 @@ void l_print(List *list, void (*print)(void *element_print, int element_type)) {
     }
     printf("BEGIN\n");
 
-    for (i=0; i<list->size;i++) {
-        print(list->tab[i]->element, list->tab[i]->element_type);
+    if (print) {
+        for (i=0; i<list->size;i++) {
+            print(list->tab[i]->element, list->tab[i]->element_type);
+        }
     }
 
     printf("END\n");
@@ -204,10 +211,11 @@ int l_remove(List *list, void *element, void (*destructor)(void *element_del, in
 }
 
 int l_clear(List *list, void (*destructor)(void *element_del, int element_type)) {
-    int i, taille = list->size;
+    int i, taille;
     if (!list) return 0;
     if (list->size == 0) return 1; // liste déjà vide
 
+    taille = list->size;
     for (i=0; i<taille; i++) {
         if (!delete_element(list, list->tab[0], 0, destructor)) return 0;
     }
