@@ -43,7 +43,8 @@ Dans le reste de ce readme, un élément fait en réalité référence à son po
 
 ### l_new et l_free
 Ces deux fonctions permettent de créer et de supprimer une liste de la mémoire.
-l_new est le seul moyen d'obtenir une liste.
+l_new est le seul moyen d'obtenir une liste.  
+l_new renvoie NULL s'il n'a pas pu créer la liste.
 
 Note : l_free ne fonctionne que si la liste est vide.
 Envisagez d'utiliser [l_clear](#l_clear) avant cette fonction
@@ -58,6 +59,11 @@ Paramètres :
 
 Il s'agit d'une fonction permettant de récupérer tous les éléments d'un tableau
 pour les mettre dans une liste **vide**.
+
+Les éléments de la liste sont les pointeurs de chaque valeur dans le tableau,
+ Il ne faut donc **toujours** mettre NULL pour le paramètre destructor des fonctions de suppression lors de la suppression d'un élément qui était initialement dans le tableau
+ (dans le cas d'un tableau créé avec malloc, utiliser free sur le premier élément supprimer l'intégralité du tableau initial (avec ses valeurs), et utiliser free
+ sur un autre élément va poser problème).
 
 ### l_insert
 Paramètres :
